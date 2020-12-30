@@ -1,0 +1,23 @@
+---
+layout: post
+category: distributed systems
+title: Why ?
+data: 2020-12-30
+---
+
+I made a website which does text-to-speech for any wikipedia page with natural sounding voice plus some additional features. The way I modeled my data allows me to add a bunch of servers if traffic is high, there are also no consistency issues with adding more servers. I don't need high consistency for every saved wikipedia article in db, stale data can also work or can be made consistent with tricks. And if some request gets lost due to server failure of network loss those can be re-requested. After I made that website most of the websites were CRUD apps to me, I thought I can make a social network with all the basic features (authentication, posting, commmenting, followers/friends) and this idea seemed workable, but only on <span style="color:green">ONE SERVER</span>. 
+
+
+<b> Understanding the Problem :</b>  
+The social network website consists of : Web servers as controller and database servers as Model in MVC framework. At some point if traffic to website grows then web servers will become bottleneck because even the most powerful server would be able to serve only some X no of requests and if the number of requests are more than that then we would need additional web server, similarly at some point the database server would become bottleneck by serving to  web servers. 
+Now what we want to do in case of web or database server becomes a bottleneck is buy more servers and divert some traffic to these new servers. 
+
+But this is where a few problems start arising: 
+In case of 1 server we know that if someone made a post/comment everyone else can see those changes i.e every read sees the most recent writes. Now let's say we have 2 db servers A, B and some user X is making changes to A because this server is closer to them and for performance we let them connect to this server.
+For some other user Y server B is closer. So a few questions we want to ask are :
+1. How are X's changes reflected to Y and vice versa?
+2. What happens if A crashes or there is network partition between A and B ?
+3. Does Y always see fresh data after Y makes some changes ?
+4. Like in my text-to-speech website does adding more servers get better performance ?
+
+These were the questions I started out with one can find other more better reasons for why distributed systems. I also wanted to understand what makes implementing big websites hard and what's down there behind the cloud abstraction.
