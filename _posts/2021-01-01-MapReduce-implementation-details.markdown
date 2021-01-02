@@ -80,9 +80,31 @@ files into one file </span>– they often pass these files as input to
 another MapReduce call, or use them from another distributed application that is able to deal with input that is
 partitioned into multiple files.</i>
 
-Job of master :
-- keeps track of where data is stored and provides the workerts location of this datworkerts location of this data 
-- Keeps track of what task is done, who is assigned what task
+<b>Job of master : </b>
+- Keeps track of state of worker : idle, in-progress or completed
+- Identity of all workers 
+- Stores the location of intermediate files along with their sizes.
+
+<b> Fault Tolerance : Worker Failure </b>
+
+- Master pings the workers periodically, if no response is recived from worker in a certain amount of time that worker is marked as failed. <span style="color:green"> Any completed map task or any map or reduce task in progress are reset back to their initial <i> idle </i> state.</span>
+
+- Completed <span style="color:green"> map tasks are re-executed </span>because their output is stored on the local disk of failed machine and is therefore inaccessible. Completed reduce tasks need not be recomputed because they are stored in GFS and that makes it available.
+
+- When a map task is executed first by worker A and
+then later executed by worker B (because A failed), all
+workers executing reduce tasks are notified of the reexecution. Any reduce task that has not already read the
+data from worker A will read the data from worker B.
+
+
+<b> Fault Tolerance : Master Failure </b>
+
+
+It is easy to make the master write periodic checkpoints
+of the master data structures described above. If the master task dies, a new copy can be started from the last
+checkpointed state. However, given that there is only a
+single master, its <span style="color:green">failure is unlikely; therefore our current implementation aborts the MapReduce computation
+if the master fails. </span>
 
 
 ### <b> Implementation as a project in 6.824 </b>
@@ -91,17 +113,100 @@ Now the above implementation is a production implementation but we want to imple
 
 <b>So how do we do it ? </b>
 
-For implementing MapReduce as a a project we will use [MIT 6.824 course Lab 1][Lab1]. But why not do it from scratch one may ask, the reason to do so is that [Prof. Robert Morris ] [Prof] provides us with tests, a middleware with which we can run this distributed system on our local machines, a broad outline code whose details we need to fill in. Tests are a core part of any software and more so in distributed systems, if we start from scratch then we first have to write our tests that cover all the corner cases for this system. And to implement tests one needs to have knowledge about  the tools (programming language, test architecture, RPC) and enough practical operating systems knowledge to implement the distributed system on one machine (I think we can also use containers to achieve the same on single machine). So if the goal is to implement distributed systems then we should use this Lab as a given and build upon it. 
+For implementing MapReduce as a a project we will use [<u>MIT 6.824 course Lab 1</u>][Lab1]. But <span style="color:green">why </span>not do it from scratch one may ask, the reason to do so is that [Prof. Robert Morris ] [Prof] provides us with <span style="color:green">tests, a middleware </span>with which we can run this distributed system on our local machines, a <span style="color:green">broad outline code </span>whose details we need to fill in. Tests are a core part of any software and more so in distributed systems, if we start from scratch then we first have to write our tests that cover all the corner cases for this system. And to implement tests one needs to have knowledge about  the tools (programming language, test architecture, RPC) and enough practical operating systems knowledge to implement the distributed system on one machine (I think we can also use containers to achieve the same on single machine). So if the goal is to implement distributed systems then we should use this Lab as a given and build upon it. 
 
-<i>Before starting the lab I was worried that there would be much spoon feeding that it would no longer be fun to implement, I would not learn about the difficulties in implementating distributed systems and would not get experience in writing medium sized software. But all this worry was out of water when I saw the code for lab, because only the broad outline is provided and all the details and software designs are in the hands of implementor, you can see this in the starting code I posted below. </i>
+<i>Before starting the lab I was worried that there would be much spoon feeding that it would no longer be fun to implement, I would not learn about the difficulties in implementating distributed systems and would not get experience in writing medium sized software. But all this worry was out of water when I saw the code for lab, because only the broad outline is provided and all the details and software designs are in the hands of implementer, you can see this in the starting code I posted below. </i>
 
 
-<b>What would all the differences be from the implementation described in paper ?</b    >
-1. We don't have GFS and not enough money to buy and test on real machines so the major difference is that all the code is going to be implemented in local machine 
+<b>What will the differences be from the implementation described in paper ?</b>
+
+ We don't have GFS and not enough money to buy real machines so the difference due to these designs are :
+ -  All the data is read from and written to local disk.
+
+ -  Master and Workers are just processes, I think we can also use containers to get the same result.
+
+ - Not using heartbeat mechanism, will use 10 seconds timeout (for this lab) and if no response is received from a worker in progress we reassign.
+
+    <i>It is easy to implement heartbeat from our side, we will do it in raft  implementation.</i>
+- No concurrent job scheduling i.e cannot submit multiple mapReduce jobs and then the MapReduce library schedules these jobs to a set of available machines within the cluster.
+
+- Master selection process and how master picks idle workers is not detailed in paper. So in labs who master is, is decided by middleware and workers call master for a job and based on if all map tasks are finished or not master assigns map task or reduce task to the asking worker. 
+
+- The naming convention for machines might be different i.e how master knows which machines to communicate and how worker knows who the master is. In lab Master and worker implementation is in same package so workers call master object for job and then master assigns some id to these workers which is remembered by both the master and the worker.
+
+- Do not discard completed map task on failed machine (process in our case) because here we don't have to worry about intermediate files being on a failed machine and we cannot retrieve it because all the data is stored on our machine disk. 
+  
+- Using a garbage collected language GO insted of of systems language like rust, C or C++ for performance.
+   
+
+### <b>Starting to code </b>
+
+Here's what the outline code looks like :
+
+- <b> General Questions </b>
+     
+    Who decides which machine is master ?
+
+
+- <b>Communication between Master and Worker:</b>
+
+    First let's figure out how to communicate between master and workers. We do this by using the RPC Package provided by GO there are other RPC frameworks like grpc which is useful if different parts of your system are written in different languages. But here it is much easier to use GO's RPC package.
+
+    <b>So how does it work ?  </b>
+
+    You can read my other article where I (just out of curosity) tried to understand and wrote about how are RPC's implemented. But we don't necessary need to know how is it implemented we are the consumer's of this tech so we care about how to use it.
+
+    <b>How to use GO's RPC package ?</b>
+
+
+    Refer to [RPC package documentation][RPC] it defines exactly how to use RPC in GO and it has everything you will need. In summary here's what you need  :
+
+    On Server side (side on which we call a function):
+
+    - Create an object with method satisfying the following criterion :
+        - Need exported methods(method starting with capital letter) of an object with exported type.
+        - Method needs to have 2 exported arguments where second's argument type is pointer. First argument contains the arguments provided by the caller and the second argument represents reply parameters to the caller.
+        - Method has a return type of error
+        <br>
+        <br>
+
+        ```
+        func (t *T) MethodName(argType T1, replyType *T2) error 
+        ```
+
+        - The method's return value, if non-nil, is passed back as a string that the client sees as if created by errors.New. If an error is returned, the reply parameter will not be sent back to the client.
+    - Register the object to rpc package hence making this object visible as a service.
+    - Start a thread that listens for calls on some port to this object.
+
+    <br>
+    On Caller side (side from which we call RPC on an object from other side):
+    - We need to do 2 tasks : Establish a connection to server side and invoke a [NewClient][newclient] (NewClient returns a new Client to handle requests to the set of services at the other end of connection) 
+    The convenience function Dial (DialHTTP) performs both steps for a raw network connection (an HTTP connection).
+
+        ```
+        client, err := rpc.DialHTTP("tcp", serverAddress + ":1234")
+        ```
+
+    - The resulting Client object has two methods, Call and Go, that specify the service and method to call, a pointer containing the arguments, and a pointer to receive the result parameters.
+
+        ```
+        args := &server.Args{7,8}
+        var reply int
+        err = client.Call("Arith.Multiply", args, &reply)
+        ```
+
+    I was not very comfortable with RPCs after reading the documentation once so I learned it by playing around with the RPC package to get a better understanding how to do and what to do.
+    
+- <b>Implementing Master </b>
+
+    <b> Job of master </b>
+    - 
 
 
 
 [6.824]: https://pdos.csail.mit.edu/6.824/labs/lab-mr.html
 [Lab1]: https://pdos.csail.mit.edu/6.824/labs/lab-mr.html
-
+[Prof]: https://en.wikipedia.org/wiki/Robert_Tappan_Morris
 [MRP]: https://static.googleusercontent.com/media/research.google.com/en//archive/mapreduce-osdi04.pdf
+[RPC]: https://golang.org/pkg/net/rpc/
+[newclient]: https://golang.org/pkg/net/rpc/#NewClient
