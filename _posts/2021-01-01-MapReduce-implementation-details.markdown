@@ -134,18 +134,12 @@ For implementing MapReduce as a a project we will use [<u>MIT 6.824 course Lab 1
 
 - The naming convention for machines might be different i.e how master knows which machines to communicate and how worker knows who the master is. In lab Master and worker implementation is in same package so workers call master object for job and then master assigns some id to these workers which is remembered by both the master and the worker.
 
-- Do not discard completed map task on failed machine (process in our case) because here we don't have to worry about intermediate files being on a failed machine and we cannot retrieve it because all the data is stored on our machine disk. 
-  
 - Using a garbage collected language GO insted of of systems language like rust, C or C++ for performance.
    
 
-### <b>Starting to code </b>
+### <b>Practical Implementation </b>
 
 Here's what the outline code looks like :
-
-- <b> General Questions </b>
-     
-    Who decides which machine is master ?
 
 
 - <b>Communication between Master and Worker:</b>
@@ -199,11 +193,54 @@ Here's what the outline code looks like :
     
 - <b>Implementing Master </b>
 
-    <b> Job of master </b>
-    - 
+    - Assign new task to worker based on if all the map tasks are done or not.
+
+      For map task master gives the filename and mapFunction, mapWorker opens the file from localDisk and read. The intermediate file names by mapWorker has format ```mr-inter-X.tmp``` where ```X``` represents the hash for some key.
+      
+       For reduce task master gives a number and reduceFunction, number represents which files reduce has to read from. 
+
+    - Reassign tasks that are taking more than 10s. What this means from the implementation point is that based on the task, add the task back to stack which keeps track of pending tasks so it can be reassigned when some worker asks for another job.
+
+    - For all the completed tasks make their corresponding output file permanent. Workers write to files and name them .tmp then returns these
+    file names back to master, master checks if the worker finished within time
+    if so it make the files permanent.
+
+    
+    
+ 
+- <b>Implementing Worker </b>
+    - Ask master for a new job, if already in midst of a job wait for 1 second for current task to finish and try again.
+    - If map job is assigned then,
+      - create all the intermediary files
+      - pass the filename and contents of that file to mapFunction which will return a list of key value pairs. 
+      - for each key value pair, pass the key through a hash function and based on the value received write this key value pair in JSON format. 
+
+    - If reduce job is assigned then
+      - from all the corresponding files read their content(you would first have to decode the JSON) in a list, 
+      - sort it (if the list too big to fit then we can use external sort but this is not the case with this lab),
+      - pass this sorted list to reduce function and write the returned result to an output file. 
+
+    - After a job is finished worker tells the master it finished the job.
+
+    <br>
+- <b> Concurrency Issues </b>
+    Beware of <span style="color:green">deadlocks and race conditions</span> you are going to use multiple threads/goroutines. If you find yourself in one of these situation, general suggestion is to use logs with good format (use unique id or something to see which worker/master is logging) to narrow down the issue.
+    
+    In case of deadlocks see where all are you using locks and see if the locks are released before returning or sending RPC. Deadlocks can also arise there are 2 threads and each one is wating for lock acquired by the other thread while holding locks.
+
+    In case of race condition use <span style="color:green">GO's race detector </span>although this <span style="color:green">does not gurantee </span>race free code. Race in code can be detected if that code is executed. So if there is some code with race condition but is unreacheable by compiler during execution that will not be detected. There is race in code if same resource is accessed from multiple threads/routines, the solution is to use locks. You can also look into other GO concurrency primitives like channels, condition variables, wait groups etc. but I don't think they will be needed in this implementation. You can use them when implementing Raft. 
+
+
+<br>
+
+<b> My Experience </b>
+
+<i>I will leave the code implementation to reader, there is not much to say about how to go about implementing master or worker. This lab is not hard to implement or debug if you know the behaviour of master and worker, the thing that made this good programming exercise for me was not knowing about most of the things before starting this lab and learning them all while implementing. For example: I did not have experience with concurrent programing language or concept (also did not know the difference between concurrent, parallel programming), all the concepts related to distributed systems. Also while reading the paper things seems like yeah I understand, its obvious then watching the lectures makes this feeling stronger but when I sat down implementing I found some gaps. I think that is due to my lack of experience in implementing after reading just docs. So all in all for me this was an excellent learning experience, I did not write good code (I am seeing it now and it does not look idiomatic) there were some workarounds which should not be there. I will not amend them but keep them as a token of how far I have come (although not that far) :) </i>
+<br>
 
 
 
+ 
 [6.824]: https://pdos.csail.mit.edu/6.824/labs/lab-mr.html
 [Lab1]: https://pdos.csail.mit.edu/6.824/labs/lab-mr.html
 [Prof]: https://en.wikipedia.org/wiki/Robert_Tappan_Morris
