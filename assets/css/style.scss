@@ -6,4 +6,11 @@
 
 body{
     font-family: sans-serif;
+    font-size: 1.15rem;
+}
+.wrapper{
+    max-width: calc(900px - (30px));
+}
+code{
+    font-size: 1.35rem;
 }

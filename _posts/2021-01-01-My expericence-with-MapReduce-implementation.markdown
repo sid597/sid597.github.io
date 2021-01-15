@@ -1,7 +1,7 @@
 ---
 layout: post
 category: distributed systems
-title: MapReduce Implementation  Details 
+title: My experience with MapReduce Implementation  
 data: 2021-01-01
 ---
 There are 2 systems working together in MapReduce programming model :

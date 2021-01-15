@@ -38,7 +38,7 @@ large to fit in memory.
 
 <i> All of the above is from MapReduce paper for further reading, consult the [MapReduce Paper] [MRP]. </i>
 
-Continue to [MapReduce Implementation details]({%link _posts/2021-01-01-MapReduce-implementation-details.markdown %})
+Continue to [My experience with MapReduce Implementation]({%link _posts/2021-01-01-My expericence-with-MapReduce-implementation.markdown%})
 
 
 

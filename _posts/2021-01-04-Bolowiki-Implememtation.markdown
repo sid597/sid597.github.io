@@ -10,6 +10,9 @@ Bolowiki is a website where one can convert wikipedia articles to natural-soundi
 
 
 
+### <b> Hacks </b>
+
+  To search wikipedia articles I figured out the api that wikipedia uses by making a few requests on the wikipedia page itself, so I implemented the search bix and any query made is passed on to real wikipedia. So the way to pass the query to wikipedia can go through server or from frontend itself. If I decided to route this through backend then speed would be slow and other issue is, if enough requests are made from same IP then it could get banned. So the best solution to do this from client side only.
 ### <b> Why ? </b>
 
   - Technical reason:

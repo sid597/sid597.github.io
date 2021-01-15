@@ -4,12 +4,17 @@ category: distributed systems
 title: Introduction to Distributed Systems 1
 data: 2020-12-30
 ---
+What is distributed system ?
+
+Ideal definition can be: multiple computers behaving as a single computer
+But this is ideal definition and is rarely achieved only by careful design and implementation. Failures are a common occurence in distributed systems so a better definition can be :  
+<i> System running on several nodes connected by a network</i>
 
 Why are distributed systems hard ? 
 1. Concurrency: Lots of parts and all the parts execute concurrently. The interaction between them needs to be precise and Correct, then there are some time dependent stuff.
 2. Partial Failures: Apart from the multiple pieces we have network and combination of all these causes some unusual failure patterns. 
-Part of system can fail and have to deal with that and make the best out of it.
-3. Performance: If I buy X no of machines how will I get X times the performance. And getting the worth out these machines careful design and implementation is required.
+Part of system can fail, we have to deal with that and make the best out of it.
+3. Performance: If I buy X no of machines how will I get X times the performance. And getting the worth out these machines requires careful design and implementation .
 
 types of failures
 Partitions

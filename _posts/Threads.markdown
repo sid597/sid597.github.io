@@ -60,12 +60,45 @@ A process is the execution of an application program with restricted rights; the
 
 Lets say we are able to run multiple programs inside our OS but there is nothing stopping one program to write into memory address of other program, if this happens then it is possible to mess with other programs. So we have this abstraction of process where we give each process an illusion that they have all the memory to themselves and they can do whatever they want to do with it.
 
- ------------------------
- | Stack  : grows down  |
- |                      |   
- |                      |
- | Heap : grows upwards |
- | Data                 |
- |Instructions          |
- ------------------------
 
+
+lock implementation:
+
+int value = FREE;
+
+Acquire() {
+    disable interrupts;
+    if (value == BUSY) {
+        put thread on wait queue;
+        Go to sleep();
+        // Enable interrupts ?
+    } else {
+        value = BUSY;
+    }
+    enable interrupts;
+}
+
+Release() {
+    disable interrupts;
+    if (anyone on wait queue) {
+        take thread off wait queue
+        Place on ready queue;
+    } else {
+        value = FREE;
+    }
+    enable interrupts;
+}
+
+The anove soltuion does not work in multiprocessor so we need another solution
+Use hardware instructions : Test&Set instruction
+
+
+test&set(&address) {
+    result = Memory[addreess];
+    Memory[address] = 1;
+    return result;
+}
+
+We can use the above instruction provided by the hardware to malke amy type of lock. This is inefficient solution
+
+GUNICORN: Web Server threads 
